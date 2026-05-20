@@ -1,33 +1,75 @@
+# Variables configured in form
+$searchValue = $datasource.searchValue
+if ([string]::IsNullOrEmpty($searchValue) -or $searchValue -eq "*") {
+    $filter = "RecipientTypeDetails -eq 'MailUniversalDistributionGroup' -or RecipientTypeDetails -eq 'MailUniversalSecurityGroup'"
+}
+else {
+    $escapedSearchValue = $searchValue.Replace("'", "''")
+    $filter = "(Name -like '*$escapedSearchValue*' -or Alias -like '*$escapedSearchValue*' -or PrimarySmtpAddress -like '*$escapedSearchValue*') -and (RecipientTypeDetails -eq 'MailUniversalDistributionGroup' -or RecipientTypeDetails -eq 'MailUniversalSecurityGroup')"
+}
+
+# Global variables
+# Outcommented as these are set from Global Variables
+# $EntraIdTenantId = ""
+# $EntraIdAppId = ""
+# $EntraIdCertificateBase64String = ""
+# $EntraIdCertificatePassword = ""
+
+# Fixed values
+# Properties to select - Select only needed properties to limit memory usage and speed up processing
+$propertiesToSelect = @(
+    "Id"
+    , "Guid"
+    , "ExchangeGuid"
+    , "ExternalDirectoryObjectId"
+    , "DisplayName"
+    , "PrimarySmtpAddress"
+    , "EmailAddresses"
+    , "Alias"
+    , "RecipientTypeDetails"
+)
+
+# PowerShell commands to import
+# Use Get-EXORecipient because it is faster and supports server-side filtering
+$commands = @(
+    "Get-Recipient"
+    , "Get-EXORecipient"
+)
+
 # Enable TLS1.2
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
 
+# Set debug logging
 $VerbosePreference = "SilentlyContinue"
 $InformationPreference = "Continue"
 $WarningPreference = "Continue"
 
-# variables configured in form:
-$GroupType = "Distribution Group" # "Mail-enabled Security Group" or "Distribution Group"
-$searchValue = $datasource.searchValue
-$searchQuery = "*$searchValue*"
-
-# PowerShell commands to import
-$commands = @("Get-DistributionGroup")
-#endregion init
+#region functions
 function Get-MSEntraCertificate {
     [CmdletBinding()]
-    param()
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $CertificateBase64String,
+        
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $CertificatePassword
+    )
     try {
-        $rawCertificate = [system.convert]::FromBase64String($EntraIdCertificateBase64String)
-        $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($rawCertificate, $EntraIdCertificatePassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
+        $rawCertificate = [system.convert]::FromBase64String($CertificateBase64String)
+        $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($rawCertificate, $CertificatePassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
         Write-Output $certificate
     }
     catch {
         $PSCmdlet.ThrowTerminatingError($_)
     }
 }
+#endregion functions
 
-#region Import module & connect
-try {    
+try {
     $actionMessage = "importing module [ExchangeOnlineManagement]"
     $importModuleSplatParams = @{
         Name        = "ExchangeOnlineManagement"
@@ -37,14 +79,15 @@ try {
     }
     $null = Import-Module @importModuleSplatParams
 
-    #region Retrieving certificate
-    $actionMessage = "retrieving certificate"
-    $certificate = Get-MSEntraCertificate
-    #endregion Retrieving certificate
-    
-    #region Connect to Microsoft Exchange Online
+    # Convert base64 certificate string to certificate object
+    $actionMessage = "converting base64 certificate string to certificate object"
+
+    $certificate = Get-MSEntraCertificate -CertificateBase64String $EntraIdCertificateBase64String -CertificatePassword $EntraIdCertificatePassword
+
+    # Connect to Microsoft Exchange Online
     # Docs: https://learn.microsoft.com/en-us/powershell/module/exchange/connect-exchangeonline?view=exchange-ps
     $actionMessage = "connecting to Microsoft Exchange Online"
+
     $createExchangeSessionSplatParams = @{
         Organization          = $EntraIdOrganization
         AppID                 = $EntraIdAppId
@@ -57,14 +100,51 @@ try {
         SkipLoadingFormatData = $true
         ErrorAction           = "Stop"
     }
+
     $null = Connect-ExchangeOnline @createExchangeSessionSplatParams
-    Write-Information "Connected to Microsoft Exchange Online"
-} 
+
+    # Get groups
+    # Docs: https://learn.microsoft.com/en-us/powershell/module/exchangepowershell/get-exorecipient?view=exchange-ps
+    $actionMessage = "querying distribution groups and mail-enabled security groups that match filter [$($filter)]"
+
+    $getGroupsSplatParams = @{
+        ResultSize  = "Unlimited"
+        Filter      = $filter
+        Properties  = $propertiesToSelect
+        ErrorAction = 'Stop'
+    }
+
+    $groups = Get-EXORecipient @getGroupsSplatParams | Select-Object -Property $propertiesToSelect
+    Write-Information "Queried distribution groups and mail-enabled security groups that match filter [$($filter)]. Result count: $(($groups | Measure-Object).Count)"
+
+    # Sort and Send results to HelloID
+    $actionMessage = "sending results to HelloID"
+    $groups | Sort-Object -Property DisplayName | ForEach-Object {
+        $groupType = switch ($_.RecipientTypeDetails) {
+            "MailUniversalDistributionGroup" { "Distribution Group" }
+            "MailUniversalSecurityGroup" { "Mail-enabled Security Group" }
+            default { "$($_.RecipientTypeDetails)" }
+        }
+
+        Write-Output @{
+            Id                        = $_.Id
+            Guid                      = $_.Guid
+            ExchangeGuid              = $_.ExchangeGuid
+            ExternalDirectoryObjectId = $_.ExternalDirectoryObjectId
+            DisplayName               = $_.DisplayName
+            PrimarySmtpAddress        = $_.PrimarySmtpAddress
+            EmailAddresses            = $_.EmailAddresses
+            Alias                     = $_.Alias
+            RecipientTypeDetails      = $_.RecipientTypeDetails
+            GroupType                 = $groupType
+        }
+    } 
+}
 catch {
     $ex = $PSItem
     if (-not [string]::IsNullOrEmpty($ex.Exception.Data.RemoteException.Message)) {
         $warningMessage = "Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Data.RemoteException.Message)"
-        $auditMessage = "Error $($actionMessage). Error: $($ex.Exception.Data.RemoteException.Message)"        
+        $auditMessage = "Error $($actionMessage). Error: $($ex.Exception.Data.RemoteException.Message)"
     }
     else {
         $warningMessage = "Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)"
@@ -72,69 +152,7 @@ catch {
     }
     Write-Warning $warningMessage
     Write-Error $auditMessage
-}
-
-
-try{
-    #region check distribution group
-    $actionMessage = "getting distribution groups"
-
-    if (-not [String]::IsNullOrEmpty($searchValue)) {
-        Write-Information "searchQuery: $searchQuery"
-
-        switch ($GroupType) {
-            "Distribution Group" { $recipientTypeDetails = "MailUniversalDistributionGroup" }
-            "Mail-enabled Security Group" { $recipientTypeDetails = "MailUniversalSecurityGroup" }
-            default { $recipientTypeDetails = $null }
-        }
-
-        $baseFilter = "Alias -like '$searchQuery' -or DisplayName -like '$searchQuery' -or Name -like '$searchQuery'"
-
-        if ($null -ne $recipientTypeDetails) {
-            $filterString = "{RecipientTypeDetails -eq '$recipientTypeDetails' -and ($baseFilter)}"
-        }
-        else {
-            $filterString = "{$baseFilter}"
-        }
-
-        $DistributionGroupParams = @{
-            Filter      = $filterString
-            ResultSize  = "Unlimited"
-            Verbose     = $false
-            ErrorAction = "Stop"
-        }
-
-        $groups = Get-DistributionGroup @DistributionGroupParams
-
-        $resultCount = @($groups).Count
-        
-        Write-Information "Result count: $resultCount"
-        
-        if ($resultCount -gt 0) {
-            foreach ($group in $groups) {
-                $returnObject = @{
-                    name               = "$( $group.DisplayName )";
-                    id                 = "$( $group.ExternalDirectoryObjectId )";
-                    primarySmtpAddress = "$( $group.PrimarySmtpAddress )";
-                }
-
-                Write-Output $returnObject
-            }
-        }
-    }
-    #endregion check distribution group           
-}
-catch {
-    $ex = $PSItem
-    if ($($ex.Exception.GetType().FullName -eq 'Microsoft.PowerShell.Commands.HttpResponseException') -or
-        $($ex.Exception.GetType().FullName -eq 'System.Net.WebException')) {
-        $errorMessage = ($ex.ErrorDetails.Message | Convertfrom-json).error_description
-    }
-    else {
-        $errorMessage = $($ex.Exception.message)
-    }
-
-    Write-Error "Error $actionMessage for Exchange Online distribution groups with the query [$searchQuery]. Error: $errorMessage"
+    # exit # use when using multiple try/catch and the script must stop
 }
 finally {
     # Docs: https://learn.microsoft.com/en-us/powershell/module/exchange/disconnect-exchangeonline?view=exchange-ps
@@ -143,6 +161,4 @@ finally {
         ErrorAction = "Stop"
     }
     $null = Disconnect-ExchangeOnline @deleteExchangeSessionSplatParams
-    Write-Information "Disconnected from Microsoft Exchange Online"
 }
-#endregion lookup

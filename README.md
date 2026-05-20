@@ -7,9 +7,9 @@
 ## Description
 HelloID-Conn-SA-Full-Exchange-Online-DistributionGroupDelete is a template designed for use with HelloID Service Automation (SA) Delegated Forms. It can be imported into HelloID and customized according to your requirements.
 
-By using this delegated form, you can locate and delete a distribution group in Exchange Online. The form workflow includes:
+By using this delegated form, you can locate and delete a distribution group or a mail-enabled security group in Exchange Online. The form workflow includes:
  1. Enter a search value
- 2. Retrieve and select the target distribution group from a grid
+ 2. Retrieve and select the target distribution group or mail-enabled security group from a grid
  3. Submit the form to delete the selected group in Exchange Online
 
 Notes shown in the form:

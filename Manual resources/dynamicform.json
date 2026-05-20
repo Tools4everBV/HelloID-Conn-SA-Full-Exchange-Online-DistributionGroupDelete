@@ -1,74 +1,79 @@
 [
-  {
-    "templateOptions": {
-      "title": "Retrieving this information from Exchange Online takes an average of +/- 10 seconds.",
-      "titleField": "",
-      "bannerType": "Info",
-      "useBody": true
+    {
+        "templateOptions":  {
+                                "title":  "Retrieving this information from Exchange Online takes an average of +/- 10 seconds.",
+                                "titleField":  "",
+                                "bannerType":  "Info",
+                                "useBody":  true
+                            },
+        "type":  "textbanner",
+        "summaryVisibility":  "Show",
+        "body":  "Please wait so we can retreive the input.",
+        "requiresTemplateOptions":  false,
+        "requiresKey":  false,
+        "requiresDataSource":  false
     },
-    "type": "textbanner",
-    "summaryVisibility": "Show",
-    "body": "Please wait so we can retreive the input.",
-    "requiresTemplateOptions": false,
-    "requiresKey": false,
-    "requiresDataSource": false
-  },
-  {
-    "key": "searchfield",
-    "templateOptions": {
-      "label": "Search",
-      "required": true
+    {
+        "key":  "searchfield",
+        "templateOptions":  {
+                                "label":  "Search (wildcard search in Name and Email addresses)",
+                                "required":  true,
+                                "placeholder":  "Name or Email addresses (use * to search all mail groups)"
+                            },
+        "type":  "input",
+        "summaryVisibility":  "Show",
+        "requiresTemplateOptions":  true,
+        "requiresKey":  true,
+        "requiresDataSource":  false
     },
-    "type": "input",
-    "summaryVisibility": "Show",
-    "requiresTemplateOptions": true,
-    "requiresKey": true,
-    "requiresDataSource": false
-  },
-  {
-    "key": "distributionGroup",
-    "templateOptions": {
-      "label": "Distribution groups",
-      "required": true,
-      "grid": {
-        "columns": [
-          {
-            "headerName": "Name",
-            "field": "name"
-          },
-          {
-            "headerName": "Primary Smtp Address",
-            "field": "primarySmtpAddress"
-          },
-          {
-            "headerName": "Id",
-            "field": "id"
-          }
-        ],
-        "height": 300,
-        "rowSelection": "single"
-      },
-      "dataSourceConfig": {
-        "dataSourceGuid": "$dataSourceGuid_0",
-        "input": {
-          "propertyInputs": [
-            {
-              "propertyName": "searchValue",
-              "otherFieldValue": {
-                "otherFieldKey": "searchfield"
-              }
-            }
-          ]
-        }
-      },
-      "useFilter": true,
-      "useDefault": false,
-      "allowCsvDownload": true
-    },
-    "type": "grid",
-    "summaryVisibility": "Show",
-    "requiresTemplateOptions": true,
-    "requiresKey": true,
-    "requiresDataSource": true
-  }
+    {
+        "key":  "distributionGroup",
+        "templateOptions":  {
+                                "label":  "Distribution groups",
+                                "required":  true,
+                                "grid":  {
+                                             "columns":  [
+                                                             {
+                                                                 "headerName":  "Display Name",
+                                                                 "field":  "DisplayName"
+                                                             },
+                                                             {
+                                                                 "headerName":  "Primary Smtp Address",
+                                                                 "field":  "PrimarySmtpAddress"
+                                                             },
+                                                             {
+                                                                 "headerName":  "Alias",
+                                                                 "field":  "Alias"
+                                                             },
+                                                             {
+                                                                 "headerName":  "Group Type",
+                                                                 "field":  "GroupType"
+                                                             }
+                                                         ],
+                                             "height":  300,
+                                             "rowSelection":  "single"
+                                         },
+                                "dataSourceConfig":  {
+                                                         "dataSourceGuid":  "$dataSourceGuid_0",
+                                                         "input":  {
+                                                                       "propertyInputs":  [
+                                                                                              {
+                                                                                                  "propertyName":  "searchValue",
+                                                                                                  "otherFieldValue":  {
+                                                                                                                          "otherFieldKey":  "searchfield"
+                                                                                                                      }
+                                                                                              }
+                                                                                          ]
+                                                                   }
+                                                     },
+                                "useFilter":  true,
+                                "useDefault":  false,
+                                "allowCsvDownload":  true
+                            },
+        "type":  "grid",
+        "summaryVisibility":  "Show",
+        "requiresTemplateOptions":  true,
+        "requiresKey":  true,
+        "requiresDataSource":  true
+    }
 ]
