@@ -1,14 +1,4 @@
-[
-  {
-    "key": "name",
-    "type": 0
-  },
-  {
-    "key": "id",
-    "type": 0
-  },
-  {
-    "key": "primarySmtpAddress",
-    "type": 0
-  }
-]
+{
+    "name":  "Exchange-online-distribution-group-delete | EXO-Get-Distribution-Group",
+    "runInCloud":  false
+}

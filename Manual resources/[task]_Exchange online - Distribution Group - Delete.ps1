@@ -6,8 +6,8 @@ $InformationPreference = "Continue"
 $WarningPreference = "Continue"
 
 # variables configured in form:
-$DGGroupID = $form.distributionGroup.id
-$DGGroupName = $form.distributionGroup.name
+$DGGroupID = $form.distributionGroup.Id
+$DGGroupName = $form.distributionGroup.DisplayName
 
 # PowerShell commands to import
 $commands = @("Remove-DistributionGroup")
@@ -76,13 +76,14 @@ catch {
     Write-Error $auditMessage
 }
 
-try{ 
+try { 
     #region delete distribution group
     $actionMessage = "deleting distribution group"
     $RemoveDGParams = @{
-        Identity    = $DGGroupID            
-        ErrorAction = 'Stop'
-        Confirm     = $false
+        Identity                        = $DGGroupID
+        BypassSecurityGroupManagerCheck = $true       
+        ErrorAction                     = 'Stop'
+        Confirm                         = $false
     }
 
     Remove-DistributionGroup @RemoveDGParams
